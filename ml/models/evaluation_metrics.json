@@ -1,0 +1,30 @@
+{
+    "accuracy": 0.9485,
+    "precision": 0.9541108986615678,
+    "recall": 0.9797120418848168,
+    "f1_score": 0.9667420083952212,
+    "cv_accuracy_mean": 0.94825,
+    "cv_accuracy_std": 0.0035443617196894693,
+    "confusion_matrix": {
+        "true_negatives": 400,
+        "false_positives": 72,
+        "false_negatives": 31,
+        "true_positives": 1497
+    },
+    "feature_importances": {
+        "cgpa": 0.41142407942421494,
+        "coding_score": 0.18312378271206378,
+        "projects_count": 0.15392832080440835,
+        "internships": 0.08168147701158168,
+        "certifications_count": 0.0478093270971759,
+        "work_ex_bin": 0.028989367702637995,
+        "skill_python": 0.014588526149203303,
+        "skill_sql": 0.013849088355920138,
+        "skill_java": 0.012987180705128299,
+        "skill_web_dev": 0.012777495077957422,
+        "skill_data_analysis": 0.011242685854540838,
+        "skill_ml": 0.010220460262124812,
+        "skill_react": 0.008767504852058284,
+        "skill_cloud": 0.008610703990984405
+    }
+}
