@@ -73,11 +73,24 @@ def get_db():
 
 
 def check_connection():
-    """Verifies that the PostgreSQL server is running and database is accessible"""
+    """Verifies that the PostgreSQL server is running and database is accessible with fast timeout"""
     try:
+        import socket
+        from urllib.parse import urlparse
+        if DATABASE_URI:
+            parsed = urlparse(DATABASE_URI)
+            host = parsed.hostname or "localhost"
+            port = parsed.port or 5432
+        else:
+            host = os.getenv("DB_HOST", "localhost")
+            port = int(os.getenv("DB_PORT", "5432"))
+        
+        # Immediate socket probe (0.5s timeout) to prevent blocking when database is offline
+        with socket.create_connection((host, port), timeout=0.5):
+            pass
+            
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         return True
-    except Exception as e:
-        print(f"[-] Database connection failure: {e}")
+    except Exception:
         return False

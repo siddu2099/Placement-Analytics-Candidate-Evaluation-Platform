@@ -11,7 +11,7 @@ from database.connection import engine
 from ml.pipeline import create_production_pipeline, ALL_FEATURES
 
 def load_training_data():
-    """Extracts the fully integrated analytical view from the PostgreSQL warehouse"""
+    """Extracts the fully integrated analytical view from the PostgreSQL warehouse, with fallback to CSV"""
     print("[*] Connecting to PostgreSQL Warehouse to extract student records...")
     
     query = """
@@ -38,10 +38,43 @@ def load_training_data():
     JOIN dim_skills t ON f.student_id = t.student_id;
     """
     
-    with engine.connect() as conn:
-        df = pd.read_sql(text(query), conn)
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        if len(df) > 0:
+            print(f"[+] Loaded {len(df)} student profiles from the PostgreSQL warehouse.")
+            return df
+        print("[-] PostgreSQL tables are empty. Falling back to local processed dataset.")
+    except Exception as e:
+        print(f"[-] Database query failed ({e}). Falling back to processed CSV dataset.")
         
-    print(f"[+] Loaded {len(df)} student profiles from the warehouse.")
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    csv_path = os.path.join(current_dir, '..', 'data', 'processed', 'master_student_dataset.csv')
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(f"Neither PostgreSQL nor local CSV dataset found at: {csv_path}")
+        
+    print(f"[i] Loading training data from: {csv_path}")
+    raw_csv = pd.read_csv(csv_path)
+    
+    df = pd.DataFrame({
+        'student_id': raw_csv['Student_ID'],
+        'cgpa': raw_csv['CGPA'],
+        'coding_score': raw_csv['Coding_Score'],
+        'work_experience': raw_csv['Work_Exp'],
+        'internships': raw_csv['Internships'],
+        'projects_count': raw_csv['Projects_Count'],
+        'certifications_count': raw_csv['Certifications_Count'],
+        'skill_python': raw_csv['Skills'].apply(lambda x: 1 if 'Python' in str(x) else 0),
+        'skill_sql': raw_csv['Skills'].apply(lambda x: 1 if 'SQL' in str(x) else 0),
+        'skill_java': raw_csv['Skills'].apply(lambda x: 1 if 'Java' in str(x) else 0),
+        'skill_data_analysis': raw_csv['Skills'].apply(lambda x: 1 if 'Data Analysis' in str(x) else 0),
+        'skill_web_dev': raw_csv['Skills'].apply(lambda x: 1 if 'Web Dev' in str(x) else 0),
+        'skill_ml': raw_csv['Skills'].apply(lambda x: 1 if 'Machine Learning' in str(x) else 0),
+        'skill_cloud': raw_csv['Skills'].apply(lambda x: 1 if 'Cloud' in str(x) else 0),
+        'skill_react': raw_csv['Skills'].apply(lambda x: 1 if 'React' in str(x) else 0),
+        'placement_status': raw_csv['Placement_Status']
+    })
+    print(f"[+] Loaded {len(df)} student profiles from the CSV dataset.")
     return df
 
 def preprocess_df(df):

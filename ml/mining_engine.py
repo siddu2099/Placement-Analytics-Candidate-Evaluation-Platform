@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from mlxtend.frequent_patterns import apriori, association_rules
 from sqlalchemy import text
-from database.connection import engine
+from database.connection import engine, check_connection
 
 def get_placement_rules():
     """
@@ -25,11 +25,16 @@ def get_placement_rules():
     JOIN dim_experience e ON f.student_id = e.student_id
     JOIN dim_skills t ON f.student_id = t.student_id;
     """
-    try:
-        with engine.connect() as conn:
-            df = pd.read_sql(text(query), conn)
-    except Exception as e:
-        print(f"[-] Database query failed in mining engine: {e}")
+    df = None
+    if check_connection():
+        try:
+            with engine.connect() as conn:
+                df = pd.read_sql(text(query), conn)
+        except Exception as e:
+            print(f"[-] Database query failed in mining engine: {e}")
+            df = None
+
+    if df is None or len(df) == 0:
         # Fallback to local CSV if database is offline or not configured
         current_dir = os.path.dirname(os.path.abspath(__file__))
         csv_path = os.path.join(current_dir, '..', 'data', 'processed', 'master_student_dataset.csv')
@@ -46,6 +51,7 @@ def get_placement_rules():
              df['skill_react'] = df['Skills'].apply(lambda x: 'React' in str(x))
              df['work_experience'] = df['Work_Exp']
              df['placement_status'] = df['Placement_Status']
+             df['internships'] = df['Internships']
         else:
              return []
 

@@ -146,12 +146,21 @@ class ResumeParser:
                     pass
                     
         # 4. Internships count extraction
-        # Searches for occurrences of "intern" or "internship"
         internship_count = 0
-        intern_matches = re.findall(r'\bintern(?:ship)?\b', raw_text.lower())
-        # Logical mapping: each pair of mentions roughly correlates with 1 internship project
-        if intern_matches:
-            internship_count = min(3, len(intern_matches) // 2 + 1)
+        digit_match = (
+            re.search(r'(\d+)\s*(?:technical\s*)?intern(?:ships?)?', raw_text.lower()) or
+            re.search(r'intern(?:ships?)?[:\s-]+(\d+)', raw_text.lower())
+        )
+        if digit_match:
+            try:
+                internship_count = min(3, int(digit_match.group(1)))
+            except ValueError:
+                pass
+                
+        if internship_count == 0:
+            intern_matches = re.findall(r'\bintern(?:ships?)?\b', raw_text.lower())
+            if intern_matches:
+                internship_count = min(3, max(1, len(intern_matches) // 2))
             
         # 5. Work Experience (Binary check)
         # Matches typical patterns of formal corporate jobs: "software engineer", "analyst", "developer", "experience"

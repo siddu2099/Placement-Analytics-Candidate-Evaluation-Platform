@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from sqlalchemy import Column, Integer, Float, String, Boolean, ForeignKey, text
-from database.connection import engine, Base, SessionLocal
+from database.connection import engine, Base, SessionLocal, check_connection
 
 # ==========================================
 # 1. STAR SCHEMA SCHEMAS (OR REPLACE SCHEMA)
@@ -39,6 +39,31 @@ class FactPlacements(Base):
     placement_status = Column(String(20), nullable=False)
     salary = Column(Integer, default=0)
 
+def ensure_database_exists():
+    """Connects to default postgres database to create placement_db if not yet created"""
+    try:
+        import psycopg2
+        from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+        
+        user = os.getenv("DB_USER", "postgres")
+        password = os.getenv("DB_PASS", "shilpa@123")
+        host = os.getenv("DB_HOST", "localhost")
+        port = int(os.getenv("DB_PORT", "5432"))
+        db_name = os.getenv("DB_NAME", "placement_db")
+        
+        conn = psycopg2.connect(dbname="postgres", user=user, password=password, host=host, port=port, connect_timeout=3)
+        conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        cur = conn.cursor()
+        cur.execute(f"SELECT 1 FROM pg_database WHERE datname='{db_name}'")
+        if not cur.fetchone():
+            print(f"[*] Database '{db_name}' not found. Creating '{db_name}'...")
+            cur.execute(f'CREATE DATABASE "{db_name}"')
+            print(f"[+] Database '{db_name}' created successfully in PostgreSQL!")
+        cur.close()
+        conn.close()
+    except Exception:
+        pass
+
 def run_etl():
     print("[*] Starting ETL Pipeline execution...")
     
@@ -65,7 +90,13 @@ def run_etl():
     print("[+] All data validation assertions passed successfully.")
     
     # 4. Load Phase: Initialize Database star schema
+    ensure_database_exists()
     print("[*] Rebuilding PostgreSQL database tables...")
+    if not check_connection():
+        print("[-] Database Warning: Cannot establish connection to PostgreSQL.")
+        print("[!] Please verify PostgreSQL is running, port 5432 is open, and credentials in .env are configured.")
+        print("[i] ETL validated 10,000 records successfully from CSV. Aborting database load step.")
+        return
     # Drop all existing tables cascadingly to ensure clean schemas
     with engine.connect() as conn:
         conn.execute(text("DROP TABLE IF EXISTS fact_placements CASCADE;"))

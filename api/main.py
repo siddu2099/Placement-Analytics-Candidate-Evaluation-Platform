@@ -129,7 +129,7 @@ def predict_placement(profile: StudentProfile):
             
         return {
             "placement_status": "Placed" if prediction == 1 else "Not Placed",
-            "probability": round(probability * 100, 1),
+            "probability": float(round(probability * 100, 1)),
             "advice": advice,
             "recommendations": recommendations
         }
@@ -185,44 +185,25 @@ def get_warehouse_statistics():
     Queries the PostgreSQL Data Warehouse facts table to compute overall placement distribution,
     total cohort counts, and baseline average salary.
     """
-    try:
-        query = """
-        SELECT 
-            COUNT(student_id) as total,
-            SUM(CASE WHEN placement_status = 'Placed' THEN 1 ELSE 0 END) as placed,
-            SUM(CASE WHEN placement_status = 'Not Placed' THEN 1 ELSE 0 END) as not_placed,
-            AVG(CASE WHEN placement_status = 'Placed' THEN salary ELSE NULL END) as avg_sal
-        FROM fact_placements;
-        """
-        
-        with engine.connect() as conn:
-            result = conn.execute(text(query)).fetchone()
-            
-        total = int(result[0] or 0)
-        placed = int(result[1] or 0)
-        not_placed = int(result[2] or 0)
-        avg_salary = float(result[3] or 0.0)
-        
-        placement_rate = (placed / total * 100) if total > 0 else 0.0
-        
-        return {
-            "placed_count": placed,
-            "not_placed_count": not_placed,
-            "total_records": total,
-            "average_salary": round(avg_salary, 2),
-            "placement_rate": round(placement_rate, 2)
-        }
-        
-    except Exception as db_err:
-        print(f"[-] Database query failed in stats route: {db_err}")
-        # Fallback count logic using processed CSV
+    if check_connection():
         try:
-            csv_path = os.path.join(current_dir, '..', 'data', 'processed', 'master_student_dataset.csv')
-            df = pd.read_csv(csv_path)
-            total = len(df)
-            placed = int((df['Placement_Status'] == 'Placed').sum())
-            not_placed = total - placed
-            avg_salary = float(df[df['Placement_Status'] == 'Placed']['Salary'].mean() or 0.0)
+            query = """
+            SELECT 
+                COUNT(student_id) as total,
+                SUM(CASE WHEN placement_status = 'Placed' THEN 1 ELSE 0 END) as placed,
+                SUM(CASE WHEN placement_status = 'Not Placed' THEN 1 ELSE 0 END) as not_placed,
+                AVG(CASE WHEN placement_status = 'Placed' THEN salary ELSE NULL END) as avg_sal
+            FROM fact_placements;
+            """
+            
+            with engine.connect() as conn:
+                result = conn.execute(text(query)).fetchone()
+                
+            total = int(result[0] or 0)
+            placed = int(result[1] or 0)
+            not_placed = int(result[2] or 0)
+            avg_salary = float(result[3] or 0.0)
+            
             placement_rate = (placed / total * 100) if total > 0 else 0.0
             
             return {
@@ -232,8 +213,28 @@ def get_warehouse_statistics():
                 "average_salary": round(avg_salary, 2),
                 "placement_rate": round(placement_rate, 2)
             }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to fetch warehouse stats: {str(e)}")
+        except Exception as db_err:
+            print(f"[-] Database query failed in stats route: {db_err}")
+            
+    # Fallback count logic using processed CSV
+    try:
+        csv_path = os.path.join(current_dir, '..', 'data', 'processed', 'master_student_dataset.csv')
+        df = pd.read_csv(csv_path)
+        total = len(df)
+        placed = int((df['Placement_Status'] == 'Placed').sum())
+        not_placed = total - placed
+        avg_salary = float(df[df['Placement_Status'] == 'Placed']['Salary'].mean() or 0.0)
+        placement_rate = (placed / total * 100) if total > 0 else 0.0
+        
+        return {
+            "placed_count": placed,
+            "not_placed_count": not_placed,
+            "total_records": total,
+            "average_salary": round(avg_salary, 2),
+            "placement_rate": round(placement_rate, 2)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch warehouse stats: {str(e)}")
 
 
 @app.get("/model-info", response_model=ModelInfoResponse)
